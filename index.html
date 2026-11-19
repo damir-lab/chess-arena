@@ -42,7 +42,7 @@ main{max-width:1180px;margin:18px auto;padding:0 18px;display:grid;grid-template
 </div>
 <div id="socialMessage" role="status" class="note"></div>
 </section>
-<section id="adminDashboard" style="display:none;max-width:1180px;margin:0 auto 16px;padding:18px;background:#262421;border:1px solid #81b64c;border-radius:10px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h3 style="margin:0">Администрирование Chess Arena</h3><button class="btn secondary" id="closeAdminDashboard" style="width:auto;margin:0">Закрыть</button></div><p class="note">Доступ подтверждается ролью в базе данных. Изменение рейтинга и метки модерации записывается на сервере.</p><div id="adminSummary" class="note">Загрузка…</div><h4>Игроки</h4><div id="adminUsers" class="note">Загрузка…</div><h4 style="margin-top:18px">Партии</h4><div id="adminGames" class="note">Загрузка…</div></section><main><section class="game">
+<section id="adminDashboard" style="display:none;max-width:1180px;margin:0 auto 16px;padding:18px;background:#262421;border:1px solid #81b64c;border-radius:10px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h3 style="margin:0">Администрирование Chess Arena</h3><button class="btn secondary" id="closeAdminDashboard" style="width:auto;margin:0">Закрыть</button></div><p class="note">Доступ подтверждается ролью в базе данных. Изменение рейтинга и метки модерации записывается на сервере.</p><button class="btn secondary" id="openBoardEditor" style="width:auto">Открыть редактор тестовой доски</button><div id="adminSummary" class="note">Загрузка…</div><h4>Игроки</h4><div id="adminUsers" class="note">Загрузка…</div><h4 style="margin-top:18px">Партии</h4><div id="adminGames" class="note">Загрузка…</div></section><main><section class="game">
 <div class="board-wrap">
 <div class="player"><div><strong>♟ Ты</strong><br><small>Белые фигуры</small></div><strong>10:00</strong></div>
 <div class="board" id="board" aria-label="Шахматная доска"></div>
@@ -138,7 +138,10 @@ async function refreshAccount(){
   if(session){
     const {data}=await supabase.from("profiles").select("username").eq("id",session.user.id).maybeSingle();
     $("accountName").textContent=data?.username || session.user.user_metadata?.username || "Игрок";
-  }
+    const {data:adminRole}=await supabase.from("admin_users").select("user_id").eq("user_id",session.user.id).maybeSingle();
+    window.isArenaAdmin=!!adminRole;
+    $("openAdmin").style.display=adminRole?"inline-block":"none";
+  } else { window.isArenaAdmin=false; $("openAdmin").style.display="none"; $("adminDashboard").style.display="none"; }
 }
 $("signUp").onclick=async()=>{
   if(!valid())return;
@@ -235,6 +238,7 @@ async function loadAdminDashboard(){
  }
 }
 $("openAdmin").onclick=()=>loadAdminDashboard();
+$("openBoardEditor").onclick=()=>{if(!window.isArenaAdmin){alert("Нет прав администратора.");return;}adminMode=true;$("admin").classList.add("open");$("adminHint").textContent="Редактор тестовой доски открыт. Выбирай клетки и действия.";$("adminDashboard").style.display="none";};
 $("closeAdminDashboard").onclick=()=>$("adminDashboard").style.display="none";
 
 await refreshAccount();

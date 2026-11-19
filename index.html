@@ -97,7 +97,16 @@ $("signIn").onclick=async()=>{
   const nick=normalizedNick(), pass=$("authPassword").value;
   const {error}=await supabase.auth.signInWithPassword({email:nick+"@users.chess-arena.invalid",password:pass});
   if(error)msg("Не удалось войти. Проверь ник и пароль.",true);
-  else {msg("Вход выполнен.");await refreshAccount();}
+  else {
+    const {data:{user}}=await supabase.auth.getUser();
+    const {data:profile}=await supabase.from("profiles").select("id").eq("id",user.id).maybeSingle();
+    if(!profile){
+      const {error:profileError}=await supabase.from("profiles").insert({id:user.id,username:nick});
+      if(profileError)msg("Вход выполнен, но профиль не создан: "+profileError.message,true);
+      else msg("Вход выполнен.");
+    } else msg("Вход выполнен.");
+    await refreshAccount();
+  }
 };
 $("signOut").onclick=async()=>{await supabase.auth.signOut();msg("Ты вышел из аккаунта.");await refreshAccount();};
 supabase.auth.onAuthStateChange(()=>refreshAccount());

@@ -28,7 +28,7 @@ main{max-width:1180px;margin:18px auto;padding:0 18px;display:grid;grid-template
     <button class="btn" id="signUp" style="width:auto;margin:0">Регистрация</button>
     <button class="btn secondary" id="signIn" style="width:auto;margin:0">Войти</button>
   </div>
-  <div id="accountBar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap"><strong id="accountName"></strong><button class="btn secondary" id="signOut" style="width:auto;margin:0">Выйти</button></div>
+  <div id="accountBar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap"><strong id="accountName"></strong><button class="btn secondary" id="openAdmin" style="display:none;width:auto;margin:0">Админ-панель</button><button class="btn secondary" id="signOut" style="width:auto;margin:0">Выйти</button></div>
   <p id="authMessage" role="status" style="font-size:13px;color:#c5c0b7;margin:10px 0 0">Ник и пароль — без отображения email. Не используй пароль от других сайтов.</p>
 </section>
 <section id="socialPanel" style="max-width:1180px;margin:0 auto 16px;padding:16px 18px;background:#262421;border-radius:10px">
@@ -42,7 +42,7 @@ main{max-width:1180px;margin:18px auto;padding:0 18px;display:grid;grid-template
 </div>
 <div id="socialMessage" role="status" class="note"></div>
 </section>
-<main><section class="game">
+<section id="adminDashboard" style="display:none;max-width:1180px;margin:0 auto 16px;padding:18px;background:#262421;border:1px solid #81b64c;border-radius:10px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h3 style="margin:0">Администрирование Chess Arena</h3><button class="btn secondary" id="closeAdminDashboard" style="width:auto;margin:0">Закрыть</button></div><p class="note">Доступ подтверждается ролью в базе данных. Изменение рейтинга и метки модерации записывается на сервере.</p><div id="adminSummary" class="note">Загрузка…</div><h4>Игроки</h4><div id="adminUsers" class="note">Загрузка…</div><h4 style="margin-top:18px">Партии</h4><div id="adminGames" class="note">Загрузка…</div></section><main><section class="game">
 <div class="board-wrap">
 <div class="player"><div><strong>♟ Ты</strong><br><small>Белые фигуры</small></div><strong>10:00</strong></div>
 <div class="board" id="board" aria-label="Шахматная доска"></div>
@@ -56,10 +56,10 @@ main{max-width:1180px;margin:18px auto;padding:0 18px;display:grid;grid-template
 <script>
 const glyph={wk:'♔',wq:'♕',wr:'♖',wb:'♗',wn:'♘',wp:'♙',bk:'♚',bq:'♛',br:'♜',bb:'♝',bn:'♞',bp:'♟'};
 const start=['br','bn','bb','bq','bk','bb','bn','br',...Array(8).fill('bp'),...Array(32).fill(null),...Array(8).fill('wp'),'wr','wn','wb','wq','wk','wb','wn','wr'];
-let board=[...start],selected=-1,flipped=false,turn='w',count=0,pawnClicks=0,adminMode=false,adminSquare=-1,adminSource=-1,adminStage='source';
+let board=[...start],selected=-1,flipped=false,turn='w',count=0,pawnClicks=0,adminMode=false,adminSquare=-1,adminSource=-1,adminStage='source';window.isArenaAdmin=false;
 const el=document.getElementById('board');
 function draw(){el.innerHTML='';for(let n=0;n<64;n++){let i=flipped?63-n:n,r=Math.floor(i/8),c=i%8,s=document.createElement('div');s.className='square '+((r+c)%2?'dark':'light')+(selected===i?' selected':'');if(board[i]){let p=document.createElement('span');p.className=board[i][0]==='w'?'white':'black';p.textContent=glyph[board[i]];s.append(p)}s.onclick=()=>click(i);el.append(s)}}
-function click(i){if(board[i]==='wp'){pawnClicks++;if(pawnClicks>=5){pawnClicks=0;const pass=prompt('Введите пароль администратора:');if(pass==='дамир007'){adminMode=true;document.getElementById('admin').classList.add('open');document.getElementById('adminHint').textContent='Панель открыта. Выбери клетку на доске.';adminSquare=i;}else if(pass!==null){alert('Неверный пароль.');}}}if(adminMode){adminSquare=i;if(adminStage==='source'){adminSource=i;document.getElementById('adminHint').textContent='Исходная клетка: '+String.fromCharCode(97+(i%8))+(8-Math.floor(i/8))+'. Теперь выбери целевую клетку.';adminStage='target';}else{document.getElementById('adminHint').textContent='Целевая клетка: '+String.fromCharCode(97+(i%8))+(8-Math.floor(i/8))+'. Нажми «Переместить» или «Поменять местами».';adminStage='source';}selected=i;draw();return;}if(selected<0){if(board[i]&&board[i][0]===turn)selected=i}else if(selected===i){selected=-1}else{if(board[i]&&board[i][0]===turn){selected=i}else{board[i]=board[selected];board[selected]=null;selected=-1;turn=turn==='w'?'b':'w';count++;document.getElementById('moves').textContent='Ход '+count+' · '+(turn==='w'?'Белые':'Чёрные')+' ходят.'}}draw()}
+function click(i){if(board[i]==='wp'){pawnClicks++;if(pawnClicks>=5){pawnClicks=0;if(window.isArenaAdmin){adminMode=true;document.getElementById('admin').classList.add('open');document.getElementById('adminHint').textContent='Панель открыта. Выбери клетку на доске.';adminSquare=i;}else{document.getElementById('moves').textContent='Админ-панель доступна только аккаунтам с правами администратора.';}}}if(adminMode){adminSquare=i;if(adminStage==='source'){adminSource=i;document.getElementById('adminHint').textContent='Исходная клетка: '+String.fromCharCode(97+(i%8))+(8-Math.floor(i/8))+'. Теперь выбери целевую клетку.';adminStage='target';}else{document.getElementById('adminHint').textContent='Целевая клетка: '+String.fromCharCode(97+(i%8))+(8-Math.floor(i/8))+'. Нажми «Переместить» или «Поменять местами».';adminStage='source';}selected=i;draw();return;}if(selected<0){if(board[i]&&board[i][0]===turn)selected=i}else if(selected===i){selected=-1}else{if(board[i]&&board[i][0]===turn){selected=i}else{board[i]=board[selected];board[selected]=null;selected=-1;turn=turn==='w'?'b':'w';count++;document.getElementById('moves').textContent='Ход '+count+' · '+(turn==='w'?'Белые':'Чёрные')+' ходят.'}}draw()}
 document.getElementById('reset').onclick=()=>{board=[...start];selected=-1;turn='w';count=0;document.getElementById('moves').textContent='Партия ещё не началась.';draw()};
 document.getElementById('flip').onclick=()=>{flipped=!flipped;draw()};
 const names=['Альфа','Гамбит','Конь в пальто','Рокировка','Ферзь','Тихий слон','Молния','Дебютёр','Матадор','Ладья-7','Пат','Сицилиец','Король Артур','Тактик','Эндшпиль'];document.getElementById('bots').innerHTML=names.map((n,i)=>'<div class="profile"><strong>♟ '+n+'</strong><small>Рейтинг '+(800+i*83)+' · Бот</small> <button class="btn secondary botInvite" data-bot="'+n+'" style="width:auto;padding:5px 9px;margin:5px 0 0">Пригласить</button></div>').join('');
@@ -206,6 +206,37 @@ async function loadSocial(){
 }
 function escapeText(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 $("searchPlayers").onclick=async()=>{const user=await me();if(!user){socialMsg("Сначала войди в аккаунт.",true);return;}const nick=$("friendSearch").value.trim().toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(nick)){socialMsg("Введи ник из 3–20 латинских символов, цифр или _.",true);return;}const {data,error}=await supabase.from("profiles").select("id,username,rating").ilike("username",nick).neq("id",user.id).limit(1);if(error){socialMsg(error.message,true);return;}if(!data.length){$("searchResults").textContent="Игрок не найден.";return;}const p=data[0];$("searchResults").innerHTML='<div class="profile"><strong>'+escapeText(p.username)+'</strong><small>Рейтинг '+p.rating+'</small> <button class="btn" id="sendFriend" style="width:auto;padding:6px 10px">Добавить в друзья</button></div>';$("sendFriend").onclick=async()=>{const {error}=await supabase.from("friend_requests").insert({sender_id:user.id,receiver_id:p.id,status:"pending"});socialMsg(error?(error.code==="23505"?"Заявка уже отправлена.":error.message):"Заявка отправлена!");};};
+
+async function loadAdminDashboard(){
+ const user=await me();
+ if(!user){socialMsg("Войди в аккаунт.",true);return;}
+ const {data:role,error:roleError}=await supabase.from("admin_users").select("user_id").eq("user_id",user.id).maybeSingle();
+ if(roleError||!role){socialMsg("Нет доступа к админ-панели.",true);return;}
+ window.isArenaAdmin=true;
+ $("openAdmin").style.display="inline-block";
+ $("adminDashboard").style.display="block";
+ $("adminSummary").textContent="Проверка прав администратора пройдена.";
+ const [usersResult,gamesResult]=await Promise.all([
+   supabase.from("profiles").select("id,username,rating,is_banned,created_at").order("created_at",{ascending:false}).limit(100),
+   supabase.from("games").select("id,white_player,black_player,status,sandbox_mode,created_at").order("created_at",{ascending:false}).limit(50)
+ ]);
+ if(usersResult.error){$("adminUsers").textContent="Ошибка загрузки игроков: "+usersResult.error.message;}
+ else {
+   $("adminUsers").innerHTML=(usersResult.data||[]).map(p=>'<div class="profile" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><strong>'+escapeText(p.username)+'</strong><small>Рейтинг: '+p.rating+' · '+(p.is_banned?'Метка модерации включена':'Обычный статус')+'</small></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" data-rating="'+p.id+'" style="width:auto;padding:7px 10px">Рейтинг</button><button class="btn secondary" data-flag="'+p.id+'" data-next="'+(!p.is_banned)+'" style="width:auto;padding:7px 10px">'+(p.is_banned?'Снять метку':'Поставить метку')+'</button></div></div>').join('')||"Пока нет игроков.";
+   document.querySelectorAll("[data-rating]").forEach(b=>b.onclick=async()=>{const raw=prompt("Новый рейтинг (0–100000):");if(raw===null)return;const rating=Number(raw);if(!Number.isInteger(rating)||rating<0||rating>100000){alert("Введи целое число от 0 до 100000.");return;}const {error}=await supabase.from("profiles").update({rating}).eq("id",b.dataset.rating);if(error)alert("Не удалось обновить рейтинг: "+error.message);else loadAdminDashboard();});
+   document.querySelectorAll("[data-flag]").forEach(b=>b.onclick=async()=>{const is_banned=b.dataset.next==="true";const {error}=await supabase.from("profiles").update({is_banned}).eq("id",b.dataset.flag);if(error)alert("Не удалось изменить метку: "+error.message);else loadAdminDashboard();});
+ }
+ if(gamesResult.error){$("adminGames").textContent="Ошибка загрузки партий: "+gamesResult.error.message;}
+ else {
+   const ids=[...new Set((gamesResult.data||[]).flatMap(g=>[g.white_player,g.black_player]))];
+   const names={};
+   if(ids.length){const p=await supabase.from("profiles").select("id,username").in("id",ids);(p.data||[]).forEach(x=>names[x.id]=x.username);}
+   $("adminGames").innerHTML=(gamesResult.data||[]).map(g=>'<div class="profile"><strong>'+escapeText(names[g.white_player]||"Игрок")+' — '+escapeText(names[g.black_player]||"Игрок")+'</strong><small>'+escapeText(g.status)+' · '+(g.sandbox_mode?'тестовая':'обычная')+' · '+new Date(g.created_at).toLocaleString()+'</small></div>').join('')||"Пока нет партий.";
+ }
+}
+$("openAdmin").onclick=()=>loadAdminDashboard();
+$("closeAdminDashboard").onclick=()=>$("adminDashboard").style.display="none";
+
 await refreshAccount();
 await loadSocial();
 const gameParam=new URLSearchParams(location.search).get("game");

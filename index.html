@@ -20,6 +20,17 @@ main{max-width:1180px;margin:18px auto;padding:0 18px;display:grid;grid-template
 </head>
 <body>
 <header><div class="brand">♟ <span>Chess</span> Arena</div><div class="status">ПРЕДВАРИТЕЛЬНАЯ ВЕРСИЯ · ЛОКАЛЬНАЯ ИГРА</div></header>
+<section id="authPanel" style="max-width:1180px;margin:18px auto 0;padding:16px 18px;background:#262421;border-radius:10px">
+  <h3 style="margin:0 0 12px">Аккаунт Chess Arena</h3>
+  <div id="authForm" style="display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+    <input id="authNick" autocomplete="username" placeholder="Ник (3–20 символов)" maxlength="20" style="flex:1;min-width:150px;padding:11px;border-radius:7px;border:1px solid #555;background:#393630;color:white">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="Пароль (от 8 символов)" style="flex:1;min-width:150px;padding:11px;border-radius:7px;border:1px solid #555;background:#393630;color:white">
+    <button class="btn" id="signUp" style="width:auto;margin:0">Регистрация</button>
+    <button class="btn secondary" id="signIn" style="width:auto;margin:0">Войти</button>
+  </div>
+  <div id="accountBar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap"><strong id="accountName"></strong><button class="btn secondary" id="signOut" style="width:auto;margin:0">Выйти</button></div>
+  <p id="authMessage" role="status" style="font-size:13px;color:#c5c0b7;margin:10px 0 0">Ник и пароль — без отображения email. Не используй пароль от других сайтов.</p>
+</section>
 <main><section class="game">
 <div class="board-wrap">
 <div class="player"><div><strong>♟ Ты</strong><br><small>Белые фигуры</small></div><strong>10:00</strong></div>
@@ -43,5 +54,53 @@ document.getElementById('flip').onclick=()=>{flipped=!flipped;draw()};
 const names=['Альфа','Гамбит','Конь в пальто','Рокировка','Ферзь'];document.getElementById('bots').innerHTML=names.map((n,i)=>'<div class="profile"><strong>♟ '+n+'</strong><small>Рейтинг '+(800+i*240)+'</small></div>').join('');
 document.getElementById('adminAdd').onclick=()=>{if(adminSquare<0){alert('Сначала выбери клетку на доске.');return;}board[adminSquare]=document.getElementById('pieceChoice').value;draw();};document.getElementById('adminRemove').onclick=()=>{if(adminSquare<0){alert('Сначала выбери клетку на доске.');return;}board[adminSquare]=null;draw();};document.getElementById('adminClose').onclick=()=>{adminMode=false;adminSquare=-1;selected=-1;document.getElementById('admin').classList.remove('open');draw();};
 draw();
+</script>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const supabase = createClient("https://dbapvypimaksjnusdhfe.supabase.co", "sb_publishable_aN6vC0yaSLpIcDkp-R_jkg_-fvBCrUU");
+const $ = (id) => document.getElementById(id);
+const msg = (text, bad=false) => { $("authMessage").textContent=text; $("authMessage").style.color=bad?"#ff9b9b":"#c5c0b7"; };
+const normalizedNick = () => $("authNick").value.trim().toLowerCase();
+const valid = () => {
+  const nick=normalizedNick(), pass=$("authPassword").value;
+  if(!/^[a-z0-9_]{3,20}$/.test(nick)){msg("Ник: 3–20 символов, латинские буквы, цифры и _.",true);return false;}
+  if(pass.length<8 || pass.length>72){msg("Пароль должен содержать от 8 до 72 символов.",true);return false;}
+  return true;
+};
+async function refreshAccount(){
+  const {data:{session}}=await supabase.auth.getSession();
+  $("authForm").style.display=session?"none":"flex";
+  $("accountBar").style.display=session?"flex":"none";
+  if(session){
+    const {data}=await supabase.from("profiles").select("username").eq("id",session.user.id).maybeSingle();
+    $("accountName").textContent=data?.username || session.user.user_metadata?.username || "Игрок";
+  }
+}
+$("signUp").onclick=async()=>{
+  if(!valid())return;
+  const nick=normalizedNick(), pass=$("authPassword").value;
+  $("signUp").disabled=true;
+  const {data,error}=await supabase.auth.signUp({email:nick+"@users.chess-arena.invalid",password:pass,options:{data:{username:nick}}});
+  if(error){msg(error.message.toLowerCase().includes("already")?"Этот ник уже занят.":error.message,true);}
+  else if(data.session){
+    const {error:profileError}=await supabase.from("profiles").insert({id:data.user.id,username:nick});
+    if(profileError){msg("Аккаунт создан, но профиль не сохранился: "+profileError.message,true);}
+    else msg("Аккаунт создан. Добро пожаловать!");
+    await refreshAccount();
+  } else {
+    msg("Регистрация отправлена. Если подтверждение email включено в Supabase, отключи его в Authentication → Sign In / Providers → Email.");
+  }
+  $("signUp").disabled=false;
+};
+$("signIn").onclick=async()=>{
+  if(!valid())return;
+  const nick=normalizedNick(), pass=$("authPassword").value;
+  const {error}=await supabase.auth.signInWithPassword({email:nick+"@users.chess-arena.invalid",password:pass});
+  if(error)msg("Не удалось войти. Проверь ник и пароль.",true);
+  else {msg("Вход выполнен.");await refreshAccount();}
+};
+$("signOut").onclick=async()=>{await supabase.auth.signOut();msg("Ты вышел из аккаунта.");await refreshAccount();};
+supabase.auth.onAuthStateChange(()=>refreshAccount());
+await refreshAccount();
 </script>
 </body></html>

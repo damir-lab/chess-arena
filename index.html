@@ -8,14 +8,14 @@
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f5f5f5;font:15px Inter,system-ui,Arial,sans-serif}
 header{height:62px;background:#262421;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 1180px)/2));border-bottom:1px solid #45413b}
 .brand{font-size:22px;font-weight:800;letter-spacing:.3px}.brand span{color:var(--green)}.status{font-size:12px;color:#d8d5cd;background:#3b3935;padding:7px 11px;border-radius:20px}
-main{max-width:1180px;margin:28px auto;padding:0 18px;display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:22px}
-.game{display:grid;grid-template-columns:minmax(0,650px) minmax(210px,1fr);gap:18px;align-items:start}
-.board-wrap{width:100%;max-width:650px}.player{background:#262421;border-radius:9px;padding:11px 14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}.player.bottom{margin:10px 0 0}.player small{color:var(--muted)}
-.board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border:5px solid #262421;border-radius:3px;overflow:hidden}
-.square{display:grid;place-items:center;position:relative;cursor:pointer;user-select:none;font-family:"DejaVu Sans",serif;font-size:clamp(24px,5.3vw,58px);line-height:1}
+main{max-width:1180px;margin:18px auto;padding:0 18px;display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start}
+.game{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:14px;align-items:start;min-width:0}
+.board-wrap{width:100%;max-width:min(100%,620px);min-width:0}.player{background:#262421;border-radius:9px;padding:11px 14px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}.player.bottom{margin:10px 0 0}.player small{color:var(--muted)}
+.board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;width:100%;border:5px solid #262421;border-radius:3px;overflow:hidden;touch-action:manipulation}
+.square{display:grid;place-items:center;position:relative;cursor:pointer;user-select:none;font-family:"DejaVu Sans",serif;font-size:clamp(20px,min(5.3vw,7.2vh),54px);line-height:1;min-width:0;min-height:0}
 .square.light{background:var(--light)}.square.dark{background:var(--dark)}.square.selected{outline:4px solid #f6f669;outline-offset:-4px}.square .white{color:#fff;text-shadow:0 1px 2px #333,0 0 3px #222}.square .black{color:#171717;text-shadow:0 1px 1px #bbb}
 .side,.right{background:var(--panel);border-radius:10px;padding:16px}.side h3,.right h3{margin:0 0 13px;font-size:16px}.moves{min-height:140px;color:var(--muted);font-size:13px;line-height:1.8}.btn{border:0;border-radius:7px;background:var(--green);color:#17200f;font-weight:750;padding:11px 14px;cursor:pointer;width:100%;margin-top:9px}.btn.secondary{background:#44413b;color:#fff}.right{height:max-content}.profile{padding:12px 0;border-bottom:1px solid #403d37}.profile:last-child{border:0}.profile strong{display:block}.profile small{color:var(--muted)}.note{font-size:12px;line-height:1.55;color:#c5c0b7;margin-top:15px}
-@media(max-width:850px){main{grid-template-columns:1fr}.game{grid-template-columns:1fr}.board-wrap{margin:auto}.side{order:2}.right{order:2}}
+@media(max-width:900px){main{grid-template-columns:1fr}.game{grid-template-columns:minmax(0,1fr) 190px}.right{order:3}}@media(max-width:620px){main{margin:12px auto;padding:0 10px}.game{grid-template-columns:1fr}.board-wrap{margin:auto;max-width:min(100%,calc(100vw - 20px))}.side{order:2}.right{order:3}.status{font-size:10px;padding:6px 8px}.square{font-size:clamp(22px,10vw,44px)}}
 </style>
 </head>
 <body>

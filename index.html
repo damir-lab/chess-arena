@@ -69,7 +69,59 @@ draw();
 </script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Chess } from "https://esm.sh/chess.js@1.4.0";
 const supabase = createClient("https://dbapvypimaksjnusdhfe.supabase.co", "sb_publishable_aN6vC0yaSLpIcDkp-R_jkg_-fvBCrUU");
+let onlineGame=null, onlineChess=null, onlineChannel=null, onlineBusy=false;
+const onlineStatus=document.createElement("div");
+onlineStatus.style.cssText="max-width:1180px;margin:10px auto;padding:0 18px;color:#d8d5cd;font-size:13px";
+document.querySelector("main").before(onlineStatus);
+function syncBoardFromChess(){board=onlineChess.board().flat().map(p=>p?p.color+p.type:null);turn=onlineChess.turn();selected=-1;draw();}
+function sqName(i){return String.fromCharCode(97+(i%8))+(8-Math.floor(i/8));}
+async function openOnlineGame(id){
+ const user=await me();
+ if(!user){onlineStatus.textContent="Войди в аккаунт, чтобы открыть партию.";return;}
+ const {data:g,error}=await supabase.from("games").select("*").eq("id",id).maybeSingle();
+ if(error||!g){onlineStatus.textContent="Партия не найдена или нет доступа.";return;}
+ if(g.white_player!==user.id&&g.black_player!==user.id){onlineStatus.textContent="Ты не участник этой партии.";return;}
+ if(g.status!=="active"){onlineStatus.textContent="Эта партия сейчас не активна.";return;}
+ if(!Array.isArray(g.position?.board)||g.position.board.length!==64){onlineStatus.textContent="Позиция партии повреждена.";return;}
+ onlineGame=g;onlineChess=new Chess(); 
+ const map={p:"p",r:"r",n:"n",b:"b",q:"q",k:"k"};
+ const rows=[];
+ for(let r=0;r<8;r++){let row="",empty=0;for(let c=0;c<8;c++){const v=g.position.board[r*8+c];if(!v){empty++;continue;}if(empty){row+=empty;empty=0;}const code=v[1];row+=v[0]==="w"?map[code].toUpperCase():map[code];}if(empty)row+=empty;rows.push(row);}
+ const fen=rows.join("/")+" "+(g.position.turn==="b"?"b":"w")+" - - 0 1";
+ try{onlineChess.load(fen);}catch(e){onlineStatus.textContent="Не удалось загрузить позицию.";onlineGame=null;return;}
+ syncBoardFromChess();
+ const side=g.white_player===user.id?"белыми":"чёрными";
+ onlineStatus.textContent="Онлайн-партия · ты играешь "+side+" · "+(onlineChess.turn()===(g.white_player===user.id?"w":"b")?"твой ход":"ход соперника")+".";
+ if(onlineChannel)await supabase.removeChannel(onlineChannel);
+ onlineChannel=supabase.channel("game-"+id).on("postgres_changes",{event:"UPDATE",schema:"public",table:"games",filter:"id=eq."+id},payload=>{
+   const fresh=payload.new;if(!fresh||!Array.isArray(fresh.position?.board))return;
+   onlineGame=fresh;
+   const rows=[];for(let r=0;r<8;r++){let row="",empty=0;for(let c=0;c<8;c++){const v=fresh.position.board[r*8+c];if(!v){empty++;continue;}if(empty){row+=empty;empty=0;}const m={p:"p",r:"r",n:"n",b:"b",q:"q",k:"k"};row+=v[0]==="w"?m[v[1]].toUpperCase():m[v[1]];}if(empty)row+=empty;rows.push(row);}
+   try{onlineChess.load(rows.join("/")+" "+(fresh.position.turn==="b"?"b":"w")+" - - 0 1");syncBoardFromChess();onlineStatus.textContent="Онлайн-партия · "+(onlineChess.turn()===(fresh.white_player===user.id?"w":"b")?"твой ход":"ход соперника")+".";}catch(e){}
+ }).subscribe();
+}
+const localClick=window.click;
+window.click=async function(i){
+ if(!onlineGame||!onlineChess)return localClick(i);
+ const user=await me();if(!user)return;
+ const myColor=onlineGame.white_player===user.id?"w":"b";
+ if(onlineChess.turn()!==myColor){onlineStatus.textContent="Сейчас ход соперника.";return;}
+ if(selected<0){const p=onlineChess.board()[Math.floor(i/8)][i%8];if(p&&p.color===myColor){selected=i;draw();}return;}
+ if(selected===i){selected=-1;draw();return;}
+ const from=sqName(selected),to=sqName(i);selected=-1;
+ let move;try{move=onlineChess.move({from,to,promotion:"q"});}catch(e){move=null;}
+ if(!move){onlineStatus.textContent="Недопустимый шахматный ход.";draw();return;}
+ syncBoardFromChess();
+ const nextBoard=board.slice();
+ onlineBusy=true;
+ const {error}=await supabase.from("games").update({position:{board:nextBoard,turn:onlineChess.turn()}}).eq("id",onlineGame.id);
+ onlineBusy=false;
+ if(error){onlineStatus.textContent="Не удалось сохранить ход: "+error.message;openOnlineGame(onlineGame.id);}
+ else onlineStatus.textContent="Ход сохранён. Ждём соперника…";
+};
+
 const $ = (id) => document.getElementById(id);
 const msg = (text, bad=false) => { $("authMessage").textContent=text; $("authMessage").style.color=bad?"#ff9b9b":"#c5c0b7"; };
 const normalizedNick = () => $("authNick").value.trim().toLowerCase();
@@ -144,8 +196,11 @@ async function loadSocial(){
  const invites=iv.data||[];let inviteProfiles={};
  if(invites.length){const q=await supabase.from("profiles").select("id,username").in("id",invites.map(x=>x.sender_id));for(const p of q.data||[])inviteProfiles[p.id]=p.username;}
  $("gameInvites").innerHTML=invites.length?invites.map(x=>'<div class="profile"><strong>'+escapeText(inviteProfiles[x.sender_id]||"Игрок")+'</strong><small>'+(x.sandbox_mode?"Тестовый режим":"Обычная партия")+'</small><br><button class="btn" data-accept-game="'+x.id+'" data-sender="'+x.sender_id+'" style="width:auto;padding:6px 10px">Принять</button> <button class="btn secondary" data-decline-game="'+x.id+'" style="width:auto;padding:6px 10px">Отклонить</button></div>').join(""):"Новых приглашений нет.";
- document.querySelectorAll("[data-accept-game]").forEach(b=>b.onclick=async()=>{const req=invites.find(x=>x.id===b.dataset.acceptGame);const {error}=await supabase.from("game_invites").update({status:"accepted"}).eq("id",req.id);if(error){socialMsg(error.message,true);return;}const initial=['br','bn','bb','bq','bk','bb','bn','br',...Array(8).fill('bp'),...Array(32).fill(null),...Array(8).fill('wp'),'wr','wn','wb','wq','wk','wb','wn','wr'];const made=await supabase.from("games").insert({white_player:req.sender_id,black_player:user.id,status:"active",sandbox_mode:req.sandbox_mode,position:{board:initial,turn:"w"}}).select("id").single();socialMsg(made.error?"Приглашение принято, но партию создать не удалось: "+made.error.message:"Партия создана! ID: "+made.data.id);loadSocial();});
+ document.querySelectorAll("[data-accept-game]").forEach(b=>b.onclick=async()=>{const req=invites.find(x=>x.id===b.dataset.acceptGame);const {error}=await supabase.from("game_invites").update({status:"accepted"}).eq("id",req.id);if(error){socialMsg(error.message,true);return;}const initial=['br','bn','bb','bq','bk','bb','bn','br',...Array(8).fill('bp'),...Array(32).fill(null),...Array(8).fill('wp'),'wr','wn','wb','wq','wk','wb','wn','wr'];const made=await supabase.from("games").insert({white_player:req.sender_id,black_player:user.id,status:"active",sandbox_mode:req.sandbox_mode,position:{board:initial,turn:"w"}}).select("id").single();if(made.error){socialMsg("Приглашение принято, но партию создать не удалось: "+made.error.message,true);}else{socialMsg("Партия создана, открываю доску…");location.href=location.pathname+"?game="+made.data.id;}});
  document.querySelectorAll("[data-decline-game]").forEach(b=>b.onclick=async()=>{const {error}=await supabase.from("game_invites").update({status:"declined"}).eq("id",b.dataset.declineGame);socialMsg(error?error.message:"Приглашение отклонено.");loadSocial();});
+ const outgoing=await supabase.from("game_invites").select("id").eq("sender_id",user.id).eq("status","accepted");
+ const acceptedIds=(outgoing.data||[]).map(x=>x.id);
+ if(acceptedIds.length){const games=await supabase.from("games").select("id,created_at").or("white_player.eq."+user.id+",black_player.eq."+user.id).eq("status","active").order("created_at",{ascending:false}).limit(5);if(games.data?.length){$("gameInvites").innerHTML+='<div class="note"><strong>Активные партии</strong>'+games.data.map(g=>'<div><a href="?game='+g.id+'" style="color:#a8d77c">Открыть партию</a></div>').join("")+'</div>';}}
  if(socialChannel)await supabase.removeChannel(socialChannel);
  socialChannel=supabase.channel("social-"+user.id).on("postgres_changes",{event:"*",schema:"public",table:"friend_requests"},()=>loadSocial()).on("postgres_changes",{event:"*",schema:"public",table:"game_invites"},()=>loadSocial()).on("postgres_changes",{event:"*",schema:"public",table:"friendships"},()=>loadSocial()).subscribe();
 }
@@ -153,5 +208,7 @@ function escapeText(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
 $("searchPlayers").onclick=async()=>{const user=await me();if(!user){socialMsg("Сначала войди в аккаунт.",true);return;}const nick=$("friendSearch").value.trim().toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(nick)){socialMsg("Введи ник из 3–20 латинских символов, цифр или _.",true);return;}const {data,error}=await supabase.from("profiles").select("id,username,rating").ilike("username",nick).neq("id",user.id).limit(1);if(error){socialMsg(error.message,true);return;}if(!data.length){$("searchResults").textContent="Игрок не найден.";return;}const p=data[0];$("searchResults").innerHTML='<div class="profile"><strong>'+escapeText(p.username)+'</strong><small>Рейтинг '+p.rating+'</small> <button class="btn" id="sendFriend" style="width:auto;padding:6px 10px">Добавить в друзья</button></div>';$("sendFriend").onclick=async()=>{const {error}=await supabase.from("friend_requests").insert({sender_id:user.id,receiver_id:p.id,status:"pending"});socialMsg(error?(error.code==="23505"?"Заявка уже отправлена.":error.message):"Заявка отправлена!");};};
 await refreshAccount();
 await loadSocial();
+const gameParam=new URLSearchParams(location.search).get("game");
+if(gameParam)await openOnlineGame(gameParam);
 </script>
 </body></html>
